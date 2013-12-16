@@ -4,18 +4,18 @@
           [org.jboss.aesh.console Prompt Console ConsoleCallback]
           [org.jboss.aesh.console.settings SettingsBuilder]))
 
-(def answers (atom 0))
+(def answers (atom 0))  ;; lol
 
 (defn store-answer [ans]
   (let [n (str "*" @answers)]
     (swap! answers inc)
-    (intern (the-ns 'clepl.user) (symbol n) ans)
+    (intern (the-ns 'clepl.user) (symbol n) ans)  ;; woah
     n))
 
 
 
 (defmacro ansi [c & s]
-  `(str (. ANSI ~c) ~@s (ANSI/reset)))
+  `(str (. ANSI ~c) ~@s (ANSI/reset)))  ;; wat
 
 (defn doinput [in]
   (let [[ans num success] (binding [*ns* (the-ns 'clepl.user)]
@@ -24,7 +24,7 @@
                                    [ans num true])
                                  (catch Exception e
                                    [(.getMessage e) "  " false])))]
-    {:ans (if (nil? ans) "nil" ans)
+    {:ans (if (nil? ans) "nil" ans)  ;; such hack
      :success success
      :num num}))
 
@@ -44,7 +44,7 @@
                        (.println (.out (.getShell console))
                                  (str (ansi cyanText num)
                                       " ~> "
-                                      (if success
+                                      (if success  ;; very hack
                                         (ansi yellowText ans)
                                         (ansi redText    ans)))))
 
