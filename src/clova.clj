@@ -1,5 +1,6 @@
 (ns clova
   (require [clova.user])
+  (use [clojure.pprint])
   (import org.jboss.aesh.util.ANSI
           [org.jboss.aesh.console Prompt Console ConsoleCallback]
           [org.jboss.aesh.console.settings SettingsBuilder]))
@@ -45,7 +46,7 @@
                                  (str (ansi cyanText num)
                                       " ~> "
                                       (if success  ;; very hack
-                                        (ansi yellowText ans)
+                                        (ansi yellowText (with-out-str (pprint ans)))
                                         (ansi redText    ans)))))
 
                      (when (= "quit" (.getBuffer output))
