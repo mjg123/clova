@@ -1,54 +1,57 @@
 (ns clova
-  (:use [clojure.java.shell :only [sh]]
-        [clojure.pprint :only [pprint]]))
+  (require [clova.user])
+  (import org.jboss.aesh.util.ANSI
+          [org.jboss.aesh.console Prompt Console ConsoleCallback]
+          [org.jboss.aesh.console.settings SettingsBuilder]))
 
-(defn plus-locations [line]
-  (filter identity
-          (map (fn [[k v]] (when (= v \+) k))
-               (map vector (range) line))))
+(def answers (atom 0))  ;; lol
 
-(defn keywordize [s]
-  (-> s
-      (.replace \  \-)
-      (.toLowerCase)
-      keyword))
-
-(defn deliminate [line delim-cols]
-  (let [delim-col-pairs (partition 2 1 delim-cols)]
-    (map (fn [[s e]]
-           (.trim (.substring line (inc s) (dec e))))
-         delim-col-pairs)))
-
-(defn parse-table [output]
-  (let [lines (.split output "\n")
-        delim-cols (plus-locations (first lines))
-        headings (map keywordize (deliminate (second lines) delim-cols))
-        rows (map #(deliminate % delim-cols) (butlast (drop 3 lines)))]
-    (map #(zipmap headings %) rows)))
-
-(def unary-args #{:insecure})
-
-(defn flatten-opt [[arg-k val]]
-  (if (unary-args arg-k) val
-    [(str "--" (name arg-k))]
-    []))
-
-(defn nova [opts subcommand]
-  (let [flatopts (mapcat flatten-opt opts)
-        cmd (concat ["nova"] flatopts [(name subcommand)])
-        output (apply sh cmd)]
-    (merge output
-           {:cmd cmd
-            :map (parse-table (output :out))})))
+(defn store-answer [ans]
+  (let [n (str "*" @answers)]
+    (swap! answers inc)
+    (intern (the-ns 'clova.user) (symbol n) ans)  ;; woah
+    n))
 
 
 
-(def envs {:rnde {:os-username "gilliard-rnde"
-                  :os-password "dummyrnde"
-                  :os-tenant-name "gilliard-rnde-project"
-                  :os-auth-url "https://csnode.rnde.aw1.hpcloud.net:35357/v2.0/"}})
+(defmacro ansi [c & s]
+  `(str (. ANSI ~c) ~@s (ANSI/reset)))  ;; wat
 
-(pprint
- (nova (merge (envs :rnde) {:insecure true}) :list))
+(defn doinput [in]
+  (let [[ans num success] (binding [*ns* (the-ns 'clova.user)]
+                            (try (let [ans (eval (read-string in))
+                                       num (store-answer ans)]
+                                   [ans num true])
+                                 (catch Exception e
+                                   [(.getMessage e) "  " false])))]
+    {:ans (if (nil? ans) "nil" ans)  ;; such hack
+     :success success
+     :num num}))
 
-(def nova-rnde (partial nova (merge (envs :rnde) {:insecure true})))
+(defn main []
+
+  (println (ansi yellowText "ready let's go"))
+
+  (let [settings-builder (SettingsBuilder.)
+        console (Console. (.create settings-builder))
+        prompt (ansi blueText "clova => ")
+        callback (reify ConsoleCallback
+                   (readConsoleOutput [_ output]
+
+                     (let [{:keys [ans num success]}
+                           (doinput (.getBuffer output))]
+
+                       (.println (.out (.getShell console))
+                                 (str (ansi cyanText num)
+                                      " ~> "
+                                      (if success  ;; very hack
+                                        (ansi yellowText ans)
+                                        (ansi redText    ans)))))
+
+                     (when (= "quit" (.getBuffer output))
+                       (.stop console))
+                     0))]
+
+    (.setPrompt console (Prompt. prompt))
+    (.setConsoleCallback console callback)
+    (.start console)))
